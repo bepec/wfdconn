@@ -10,19 +10,26 @@ class SimpleConnector: public WfdConnectionManager::ReceiverInterface {
   std::string macAddress;
   SimpleConnector(const std::string& mac): macAddress(mac) {}
 
-  void OnConnectionRequest(const WfdDevice& device, bool& accept) {
+  void OnConnectionRequestPbc(const WfdDevice& device, bool& accept) {
     if (device.macAddress != macAddress) {
-      char reply;
+      std::string reply;
       std::cout << "[CONN] Unknown MAC address." << std::endl;
-      while (reply != 'y' && reply != 'n') {
+      do {
         std::cout << "[CONN] Accept connection? [y/n] (y): ";
-        std::cin >> reply;
+        getline(std::cin, reply);
       }
-      accept = (reply == 'y');
+      while (!reply.empty() && reply != "y" && reply != "n");
+      accept = (reply == "y" || reply.empty());
     }
     else {
       accept = true;
     }
+  }
+
+  void OnConnectionRequestPin(const WfdDevice& device, bool& accept, std::string& pin) {
+    std::cout << "[CONN] Please enter 8-digit PIN or skip to reject connection: ";
+    getline(std::cin, pin);
+    accept = (pin != "");
   }
 
   void OnConnect(const WfdDevice& device) {

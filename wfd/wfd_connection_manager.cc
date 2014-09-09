@@ -2,6 +2,7 @@
 #include <iostream>
 #include <map>
 #include <stdexcept>
+#include <cassert>
 #include "wpa_types.h"
 
 std::map<WfdConnectionManager::State, std::string> StateStringMap{
@@ -19,7 +20,8 @@ std::ostream& operator<<(std::ostream& stream, WfdConnectionManager::State state
 WfdConnectionManager::WfdConnectionManager(ReceiverInterface& receiver)
 : receiver_(receiver)
 , state_(StateStop)
-, peerDevice_() {
+, peerDevice_(0) {
+  assert("PONG" == ctrl_.request("PING"));
   if (ctrl_.request("PING") != "PONG") {
     throw std::runtime_error("PING PONG test failed.");
   }
@@ -69,43 +71,66 @@ bool WfdConnectionManager::handleState() {
       return true;
       break;
 
-    case StateWaitForConnection:
-      ctrl_.waitForEvents(std::set<std::string>{"P2P-DEVICE-FOUND", "P2P-PROV-DISC-PBC-REQ"}, event_);
+    case StateWaitForConnection: {
+      ctrl_.waitForEvents(std::set<std::string>{"P2P-DEVICE-FOUND", "P2P-PROV-DISC-PBC-REQ", "P2P-PROV-DISC-ENTER-PIN"}, event_);
+      std::string p2pAddress = event_.listParameters[0];
       if (event_.name == "P2P-DEVICE-FOUND") {
-        std::unique_ptr<WfdDevice> device(new WfdDevice(event_));
-        std::cout << device->to_string() << std::endl;
-        bool accept = false;
-        receiver_.OnConnectionRequest(*device, accept);
-        if (accept) {
-          std::cout << "[WFD] Connection request accepted." << std::endl;
-          peerDevice_ = std::move(device);
-        }
-        else {
-          std::cout << "[WFD] Connection request rejected." << std::endl;
+        if (peerDevices_.count(p2pAddress) == 0) {
+          std::unique_ptr<WfdDevice> device(new WfdDevice(event_));
+          std::cout << "[WFD] New device registered: " << device->to_string() << std::endl;
+          peerDevices_.insert(std::make_pair(device->macAddress, std::move(device)));
         }
       }
-      else if (event_.name == "P2P-PROV-DISC-PBC-REQ") {
-        if (peerDevice_ == 0) {
-          std::cout << "[WFD] ERROR: Device not ready" << std::endl;
+      else {
+        if (peerDevices_.count(p2pAddress) == 0)  {
+          std::cout << "[WFD] ERROR: unknown device address: " << p2pAddress << std::endl;
           switchState(state_, StateStop);
           return true;
         }
-        else {
+
+        bool accept = false;
+        if (event_.name == "P2P-PROV-DISC-PBC-REQ") {
+          receiver_.OnConnectionRequestPbc(*peerDevices_[p2pAddress], accept);
+          if (accept) {
+            assert("OK" == ctrl_.request("WPS_PBC"));
+          }
+        }
+        else if (event_.name == "P2P-PROV-DISC-ENTER-PIN") {
+          std::string pin;
+          receiver_.OnConnectionRequestPin(*peerDevices_[p2pAddress], accept, pin);
+          if (accept) {
+            ctrl_.request(std::string("WPS_PIN any ") + pin);
+          }
+        }
+
+        if (accept) {
+          peerDevice_ = peerDevices_[p2pAddress].get();
+          std::cout << "[WFD] Connection request accepted." << std::endl;
           switchState(state_, StateConnecting);
+          return true;
+        }
+        else {
+          std::cout << "[WFD] Connection request rejected." << std::endl;
+          switchState(state_, StateStop);
           return true;
         }
       }
       break;
+    }
 
     case StateConnecting:
+      assert(peerDevice_ != 0);
       std::cout << "[WFD] Connecting with device " << peerDevice_->to_string() << std::endl;
-      ctrl_.request("WPS_PBC");
-      std::cout << "[WFD] Wait for PBC activation..." << std::endl;
-      ctrl_.waitForEvents(std::set<std::string>{"WPS-PBC-ACTIVE"}, event_);
+      // std::cout << "[WFD] Wait for PBC activation..." << std::endl;
+      // ctrl_.waitForEvents(std::set<std::string>{"WPS-PBC-ACTIVE"}, event_);
       std::cout << "[WFD] Wait for WPS to complete..." << std::endl;
       ctrl_.waitForEvents(std::set<std::string>{"WPS-SUCCESS"}, event_);
       std::cout << "[WFD] Wait for network is up..." << std::endl;
       ctrl_.waitForEvents(std::set<std::string>{"AP-STA-CONNECTED"}, event_);
+      std::cout << "[WFD] STA " << event_.listParameters[0] << " connected." << std::endl;
+      if (peerDevices_.count(event_.keyParameters["p2p_dev_addr"])) {
+        std::cout << "[WFD] Corresponding p2p device: " << peerDevices_[event_.keyParameters["p2p_dev_addr"]]->to_string() << std::endl;
+      }
       switchState(state_, StateConnected);
       receiver_.OnConnect(*peerDevice_);
       return true;
@@ -118,7 +143,7 @@ bool WfdConnectionManager::handleState() {
         std::cout << "[WFD] Remote device disconnected: " << peerDevice_->to_string() << std::endl;
         switchState(state_, StateStop);
         receiver_.OnDisconnect(*peerDevice_);
-        peerDevice_.reset();
+        peerDevice_ = 0;
         return true;
       }
       break;

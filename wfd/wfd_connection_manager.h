@@ -16,7 +16,8 @@ class WfdConnectionManager {
 
   class ReceiverInterface {
    public:
-    virtual void OnConnectionRequest(const WfdDevice& device, bool& accept) = 0;
+    virtual void OnConnectionRequestPbc(const WfdDevice& device, bool& accept) = 0;
+    virtual void OnConnectionRequestPin(const WfdDevice& device, bool& accept, std::string& pin) = 0;
     virtual void OnConnect(const WfdDevice& device) = 0;
     virtual void OnDisconnect(const WfdDevice& device) = 0;
   };
@@ -33,7 +34,9 @@ class WfdConnectionManager {
 
   ReceiverInterface& receiver_;
   State state_;
-  std::unique_ptr<WfdDevice> peerDevice_;
+  // std::unique_ptr<WfdDevice> peerDevice_;
+  WfdDevice* peerDevice_;
+  std::map<std::string, std::unique_ptr<WfdDevice> > peerDevices_;
   WpaCtrl ctrl_;
   Event event_;
 

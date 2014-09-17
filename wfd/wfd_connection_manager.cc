@@ -65,6 +65,7 @@ bool WfdConnectionManager::handleState() {
     case StateInitial:
       ctrl_.request("FLUSH");
       ctrl_.request("SET wifi_display 1");
+      ctrl_.request("SET config_methods pbc");
       ctrl_.request("WFD_SUBELEM_SET 0 00060011022a0100");
       ctrl_.request("P2P_GROUP_ADD");
       switchState(state_, StateWaitForConnection);

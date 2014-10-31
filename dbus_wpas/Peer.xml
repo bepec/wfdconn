@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+"http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node>
+  <interface name="org.freedesktop.DBus.Introspectable">
+    <method name="Introspect">
+      <arg name="data" type="s" direction="out"/>
+    </method>
+  </interface>
+  <interface name="org.freedesktop.DBus.Properties">
+    <method name="Get">
+      <arg name="interface" type="s" direction="in"/>
+      <arg name="propname" type="s" direction="in"/>
+      <arg name="value" type="v" direction="out"/>
+    </method>
+    <method name="GetAll">
+      <arg name="interface" type="s" direction="in"/>
+      <arg name="props" type="a{sv}" direction="out"/>
+    </method>
+    <method name="Set">
+      <arg name="interface" type="s" direction="in"/>
+      <arg name="propname" type="s" direction="in"/>
+      <arg name="value" type="v" direction="in"/>
+    </method>
+  </interface>
+  <interface name="fi.w1.wpa_supplicant1.Peer">
+    <property name="DeviceName" type="s" access="read"/>
+    <property name="PrimaryDeviceType" type="ay" access="read"/>
+    <property name="config_method" type="q" access="read"/>
+    <property name="level" type="i" access="read"/>
+    <property name="devicecapability" type="y" access="read"/>
+    <property name="groupcapability" type="y" access="read"/>
+    <property name="SecondaryDeviceTypes" type="aay" access="read"/>
+    <property name="VendorExtension" type="aay" access="read"/>
+    <property name="IEs" type="ay" access="read"/>
+  </interface>
+</node>

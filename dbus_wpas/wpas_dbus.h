@@ -14,6 +14,8 @@ struct WlanInterface;
 
 DBusGConnection* wpas_get_dbus_g_connection();
 
+struct DBusBase* wpas_get_dbus_base(struct WpaSupplicant*);
+
 int wpas_create(struct WpaSupplicant**);
 int wpas_release(struct WpaSupplicant**);
 int wpas_get_interface(struct WpaSupplicant*, struct WlanInterface**);

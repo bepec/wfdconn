@@ -1,17 +1,8 @@
-#include <stdlib.h>
 #include <glib.h>
 #include <dbus/dbus-glib.h>
 #include "wpas_dbus.h"
 #include "proxy_wpa_supplicant1.h"
 #include "wfd.h"
-
-
-DBusGConnection *wpas_dbus_g_connection = NULL;
-
-DBusGConnection *wpas_get_dbus_g_connection()
-{
-    return wpas_dbus_g_connection;
-}
 
 struct WpaSupplicant
 {
@@ -88,7 +79,7 @@ int _wpas_update_ifaces(struct WpaSupplicant* wpas)
     GError *error = NULL;
     GValue value = { 0 };
 
-    g_message("Getting Interfaces property.");
+    g_debug("Getting Interfaces property.");
     org_freedesktop_DBus_Properties_get(wpas->props, WPAS_DBUS_SERVICE_IFACE, "Interfaces", &value, &error);
     if (NULL != error)
     {
@@ -97,7 +88,7 @@ int _wpas_update_ifaces(struct WpaSupplicant* wpas)
     g_return_val_if_fail(NULL == error, WPAS_RESULT_ERROR);
     
     char *value_content = g_strdup_value_contents(&value);
-    g_message("Value: %s", value_content);
+    g_debug("Value: %s", value_content);
     g_free(value_content);
 
     g_assert(dbus_g_type_is_collection(G_VALUE_TYPE(&value)));
@@ -172,10 +163,9 @@ int wpas_set_wfd_ie(struct WpaSupplicant* wpas, void* ie, size_t ie_size)
     int result = WPAS_RESULT_OK;
 
     GError *error = NULL;
-    /* GArray  array = { ie, ie_size }; */
     GByteArray *array = g_byte_array_new_take(ie, ie_size);
 
-    GValue  value = { 0, };
+    GValue  value = {0,};
     g_value_init(&value, dbus_g_type_get_collection("GArray", G_TYPE_UCHAR));
     g_value_take_boxed(&value, array);
     g_assert(TRUE == G_VALUE_HOLDS_BOXED(&value));
@@ -192,99 +182,4 @@ int wpas_set_wfd_ie(struct WpaSupplicant* wpas, void* ie, size_t ie_size)
     g_byte_array_free(array, FALSE);
 
     return result;
-}
-
-void print_introspection(DBusGProxy *proxy)
-{
-    g_assert(NULL != proxy);
-    const char* path = dbus_g_proxy_get_path(proxy);
-    g_message("Creating introspectable proxy object for %s.", path);
-
-    GError *error = NULL;
-
-    DBusGProxy *proxy_introspectable = dbus_g_proxy_new_from_proxy(
-            proxy,
-            DBUS_INTERFACE_INTROSPECTABLE,
-            path);
-    if (NULL == proxy_introspectable)
-    {
-        g_warning("Failed to create proxy object for %s.", path);
-    }
-    else
-    {
-        char *introspection;
-        if (FALSE == org_freedesktop_DBus_Introspectable_introspect(proxy_introspectable, &introspection, &error)) {
-            g_assert(NULL != error);
-            g_warning("Failed to get introspection: %s", error->message);
-        }
-        else
-        {
-            g_assert(NULL != introspection);
-            g_message("Introspection for \"%s\":\n%s", path, introspection);
-            g_free(introspection);
-        }
-        g_object_unref(proxy_introspectable);
-    }
-}
-
-int main(int arc, char* argv[])
-{
-    /* g_mem_set_vtable(glib_mem_profiler_table); */
-
-    GMainLoop       *main_loop = NULL;
-    GError          *error = NULL;
-
-    g_type_init();
-    /* g_log_set_always_fatal(); */
-
-    g_message("Creating the GMainLoop.");
-    main_loop = g_main_loop_new(NULL, FALSE);
-    g_assert(NULL != main_loop);
-
-    g_message("Connecting to the System bus.");
-    wpas_dbus_g_connection = dbus_g_bus_get(DBUS_BUS_SYSTEM, &error);
-    if (error != NULL) g_error(error->message);
-
-    struct WpaSupplicant *wpas = NULL;
-    g_assert(WPAS_RESULT_OK == wpas_create(&wpas));
-    g_assert(NULL != wpas);
-
-    struct WlanInterface *wlan = NULL;
-    g_assert(WPAS_RESULT_OK == wpas_get_interface(wpas, &wlan));
-    g_assert(NULL != wlan);
-
-    g_message("Setting config methods.");
-    g_assert(WPAS_RESULT_OK == wlan_set_config_methods(wlan, "pbc"));
-
-    g_message("Setting display info.");
-    struct WlanDisplayInfo display_info =
-        { .device_type  = WPAS_WFD_DISPLAY_PRIMARY_SINK
-        , .available    = WPAS_WFD_SESSION_AVAILABLE
-        , .connectivity = WPAS_WFD_CONNECTIVITY_P2P
-        , .control_port = 0
-        , .bandwidth    = 5000
-        };
-    g_assert(WPAS_RESULT_OK == wlan_set_display(wlan, &display_info));
-
-    g_message("Starting autonomous p2p group.");
-
-    g_assert(WPAS_RESULT_OK == wlan_flush(wlan));
-
-    int is_go = 0;
-    g_assert(WPAS_RESULT_OK == wlan_is_group_owner(wlan, &is_go));
-    g_message("Is GO: %d", is_go);
-
-    /* print_introspection(wlan->proxy); */
-
-    g_message("Starting main loop.");
-    g_main_loop_run(main_loop);
-
-    wlan_release(&wlan);
-    wpas_release(&wpas);
-
-    g_main_loop_unref(main_loop);
-    
-    /* g_mem_profile(); */
-
-    return EXIT_FAILURE;
 }

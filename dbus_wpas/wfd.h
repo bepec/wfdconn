@@ -39,13 +39,6 @@ struct WlanCallbacks
   void (*cb_device_disconnected)(struct WlanInterface*, const char* p2p_mac, const char* sta_mac);
 };
 
-struct wpas_callbacks
-{
-  void (*cb_set_wfd_ie)(const void* bytes, int length);
-};
-
-struct DBusBase* wlan_get_dbus_base(struct WlanInterface*);
-
 int wlan_create(struct WlanInterface**, const char* dbus_path);
 int wlan_release(struct WlanInterface**);
 int wlan_set_callbacks(struct WlanInterface*, struct WlanCallbacks*);
@@ -55,4 +48,4 @@ int wlan_get_group_info(struct WlanInterface*, int* o_info);
 int wlan_start_autonomous_group(struct WlanInterface*);
 int wlan_flush(struct WlanInterface*);
 int wlan_start_pbc(struct WlanInterface*, const char* mac_address);
-int wlan_reject_connection(struct WlanInterface*, const char* mac_address);
+int wlan_reject_peer(struct WlanInterface*, const char* mac_address);

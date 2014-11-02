@@ -23,7 +23,8 @@ void handle_wlan_connection_request(struct WlanInterface* wlan, const char* mac_
   g_message("WLAN connection request: mac=\'%s\', name=\'%s\', ie=\'%s\'",
             mac_address, device_name, wfd_ie);
 
-  wlan_start_pbc(wlan, mac_address);
+  /* wlan_start_pbc(wlan, mac_address); */
+  wlan_reject_peer(wlan, mac_address);
 }
 
 void handle_wlan_device_connected(struct WlanInterface* wlan, const char* p2p_mac, const char* sta_mac)

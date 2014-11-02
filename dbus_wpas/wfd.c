@@ -586,7 +586,7 @@ int wlan_start_pbc(struct WlanInterface* wlan, const char* bssid)
 
   if (NULL == peer)
   {
-    g_warning("Uknown device with mac address %s.", bssid);
+    g_warning("Uknown BSSID %s.", bssid);
     result = WPAS_RESULT_ERROR;
   }
   else
@@ -613,14 +613,11 @@ int wlan_start_pbc(struct WlanInterface* wlan, const char* bssid)
 
     GError *error = NULL;
     fi_w1_wpa_supplicant1_Interface_WPS_start(
-            wlan->wps,
-            params,
-            NULL,
-            &error);
-
+            wlan->wps, params, NULL, &error);
     if (NULL != error)
     {
-      g_error("fi_w1_wpa_supplicant1_Interface_WPS_start(..) failed: %s", error->message);
+      g_error("fi_w1_wpa_supplicant1_Interface_WPS_start(..) failed: %s",
+              error->message);
       result = WPAS_RESULT_ERROR;
     }
   }
@@ -628,12 +625,34 @@ int wlan_start_pbc(struct WlanInterface* wlan, const char* bssid)
   return result;
 }
 
-int wlan_reject_connection(struct WlanInterface* wlan, const char* mac_address)
+int wlan_reject_peer(struct WlanInterface* wlan, const char* p2p_mac)
 {
-  g_debug("wlan_reject_connection(%p, %s)", wlan, mac_address);
+  g_debug("wlan_reject_connection(%p, %s)", wlan, p2p_mac);
   g_assert(NULL != wlan);
 
   int result = WPAS_RESULT_OK;
+
+  struct WfdPeer* peer = g_hash_table_find(wlan->peers, _find_peer_by_mac, (gpointer)p2p_mac);
+
+  if (NULL == peer)
+  {
+    g_warning("Uknown P2P MAC %s.", p2p_mac);
+    result = WPAS_RESULT_ERROR;
+  }
+  else
+  {
+    g_debug("Found peer: %s", peer_trace(peer));
+
+    GError* error = NULL;
+    fi_w1_wpa_supplicant1_Interface_P2PDevice_reject_peer(
+        wlan->p2p, ((struct DBusBase*)peer)->opath, &error);
+    if (NULL != error)
+    {
+      g_error("fi_w1_wpa_supplicant1_Interface_P2PDevice_reject_peer(..) failed: %s",
+              error->message);
+      result = WPAS_RESULT_ERROR;
+    }
+  }
 
   return result;
 }

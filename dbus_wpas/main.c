@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include "wpas_dbus.h"
 #include "wfd.h"
+#include "dhcp_lease.h"
+
+static const char* DHCP_LEASES_DB="/var/lib/dhcp/db/dhcpd.leases";
 
 DBusGConnection *wpas_dbus_g_connection = NULL;
 
@@ -23,14 +26,27 @@ void handle_wlan_connection_request(struct WlanInterface* wlan, const char* mac_
   g_message("WLAN connection request: mac=\'%s\', name=\'%s\', ie=\'%s\'",
             mac_address, device_name, wfd_ie);
 
-  /* wlan_start_pbc(wlan, mac_address); */
-  wlan_reject_peer(wlan, mac_address);
+  wlan_start_pbc(wlan, mac_address);
+  /* wlan_reject_peer(wlan, mac_address); */
 }
 
 void handle_wlan_device_connected(struct WlanInterface* wlan, const char* p2p_mac, const char* sta_mac)
 {
   g_message("Device connected: p2p_mac=\'%s\', sta_mac=\'%s\'",
             p2p_mac, sta_mac);
+
+  for (int i = 0; i < 10; i++)
+  {
+    g_message("Attempt %d...", i);
+
+    const char* ip = mac_to_ip(DHCP_LEASES_DB, sta_mac);
+    if (NULL != ip)
+    {
+      g_message("Identified IP address: %s.", ip);
+      break;
+    }
+    else g_usleep(1000000);
+  }
 }
 
 int main(int arc, char* argv[])
@@ -42,7 +58,6 @@ int main(int arc, char* argv[])
     GError     *error = NULL;
 
     g_type_init();
-    /* g_log_set_always_fatal(); */
 
     g_message("Creating the GMainLoop.");
     main_loop = g_main_loop_new(NULL, FALSE);
